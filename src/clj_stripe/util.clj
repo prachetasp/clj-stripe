@@ -9,55 +9,52 @@
 (ns clj-stripe.util
 	(:require [clj-http.client :as client]))
 
-(defn keys-2-strings
-  "Converts all the keys of a map from keywords to strings."
-  [km]
-  (reduce (fn [m [k v]] (assoc m (name k) v)) {} km))
+(defonce ^:dynamic *stripe-token* nil)
+
+(defmacro with-token
+  "Binds the specified Stripe authentication token to the stripe-token variable and executes the body."
+  [token & body]
+  `(binding [*stripe-token* ~token] ~@body))
+
+;; Root URL for the API calls
+(defonce api-root "https://api.stripe.com/v1")
 
 (defn- remove-nulls
   "Removes from a map the keys with nil value."
   [m]
   (into {} (remove (comp nil? second) m)))
 
-(defn merge-maps
-  "Merges several maps into one, removing any key with nil value."
-  [& maps]
-  (remove-nulls (reduce into {} maps)))
+(defn build-url
+  "Accepts url-stubs in the form of e.g. [\"/customers\" :customer]"
+  [params url-stubs]
+  (reduce (fn [[url d] [stub kw]]
+            [(str url (str stub) (if-let [param (kw params)] (str "/" param) ""))
+             (dissoc d kw)])
+    ["" params]
+    url-stubs))
 
-(defn- append-param
-  "Appends a URL parameter to a string."
-  [s name value]
-  (if value
-    (let [print-param (fn [n v] (str n "=" v))]
-      (if (and s (> (count s) 0))
-	(str s "&" (print-param name value))
-	(print-param name value)))
-    s))
+(defn kws-to-url-params [params]
+  (into {} (for [[k v] params] [(.replace (name k) "-" "_") v])))
 
-(defn url-with-optional-params
-  "If parameters are provided, creates a parametrized URL as
-  originalurl?param1name=param1value&param2name=param2value&..."
-  [url m [& param-names]]
-  (let [params-str (reduce #(append-param %1 %2 (get m %2 nil)) nil param-names)]
-    (str url (if params-str (str "?" params-str) ""))))
+(defn build-options [token params]
+  {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json})
 
-(defn post-request
+;; Doesn't really need to be a macro but saves reflection on the method
+;; Use if performance dictates?
+#_(defmacro make-request
   "POSTs a to a url using the provided authentication token and parameters."
-  [token url params]
-  (try
-    (:body (client/post url {:basic-auth [token] :query-params params :throw-exceptions false :as :json}))
-    (catch java.lang.Exception e e)))
+  [method token url params]
+  `(try
+     (:body (~method (str ~api-root ~url) (build-options ~token ~params)))
+     (catch java.lang.Exception e# e#)))
 
-(defn get-request
-  "Issues a GET request to the specified url, using the provided authentication token and parameters."
-  [token url]
+(defn make-request
+  "POSTs a to a url using the provided authentication token and parameters."
+  [method token url params]
   (try
-    (:body (client/get url {:basic-auth [token] :throw-exceptions false :as :json}))
-    (catch java.lang.Exception e e)))
+     (:body (method (str api-root url) (build-options token params)))
+     (catch java.lang.Exception e e)))
 
-(defn delete-request
-  "Issues a DELETE request to the specified url, using the provided authentication token and parameters."
-  [token url]
-  (try
-    (:body (client/delete url {:basic-auth [token] :throw-exceptions false :as :json}))
-    (catch java.lang.Exception e e)))
+(defn do-request [method token og-params & url-stubs]
+  (let [[url params] (build-url og-params url-stubs)]
+    (make-request method token url params)))
