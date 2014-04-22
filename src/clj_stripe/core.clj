@@ -1,4 +1,4 @@
-;   Copyright (c) 2011 Alberto Bengoa. All rights reserved.
+;   Copyright (c) 2014 Alberto Bengoa/Prachetas Prabhu. All rights reserved.
 ;   The use and distribution terms for this software are covered by the
 ;   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
 ;   which can be found in the file epl-v10.html at the root of this distribution.
@@ -68,6 +68,7 @@
                   :coupons ["/coupons" :coupon-id]
                   :customers ["/customers" :customer-id]
                   ;;:discounts ["/discount"] ; no-id endpt
+                  :events ["/events" :event-id]
                   :invoiceitems ["/invoiceitems" :invoiceitem-id]
                   :invoices ["/invoices" :invoice-id]
                   :invoices-lines ["/lines"] ; no-id endpt
@@ -90,6 +91,7 @@
                            :delete [client/delete]
                            :get [client/get]}
                  :customers crud-mapping
+                 :events {:get [client/get]}
                  :invoiceitems crud-mapping
                  :invoices {:create [client/post]
                             :get [client/get]
@@ -115,6 +117,7 @@
 (defn on-charges [op-params] (do-op op-params :charges))
 (defn on-coupons [op-params] (do-op op-params :coupons))
 (defn on-customers [op-params] (do-op op-params :customers))
+(defn on-events [op-params] (do-op op-params :events))
 (defn on-invoiceitems [op-params] (do-op op-params :invoiceitems))
 (defn on-invoices [op-params] (do-op op-params :invoices))
 (defn on-plans [op-params] (do-op op-params :plans))

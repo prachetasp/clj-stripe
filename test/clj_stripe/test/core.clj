@@ -1,4 +1,4 @@
-;   Copyright (c) 2011 Alberto Bengoa. All rights reserved.
+;   Copyright (c) 2014 Alberto Bengoa/Prachetas Prabhu. All rights reserved.
 ;   The use and distribution terms for this software are covered by the
 ;   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
 ;   which can be found in the file epl-v10.html at the root of this distribution.
@@ -54,3 +54,8 @@
     ;; This test works as long as you don't have too many customers
     ;; TODO: add pagination
     (test/is (nil? (test-subscription-exists sub-id existing-cust-id)))))
+
+(test/deftest events-test
+  (let [{event-id :id :as recent-event} (first (:data (on-events {:op :get :params {}})))]
+    (test/is (not (nil? event-id)))
+    (test/is (= (on-events {:op :get :params {:event-id event-id}}) recent-event))))
