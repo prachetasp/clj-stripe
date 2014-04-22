@@ -11,24 +11,23 @@
 
 (defonce ^:dynamic *stripe-token* nil)
 
-(defmacro with-token
-  "Binds the specified Stripe authentication token to the stripe-token variable and executes the body."
-  [token & body]
+(defmacro with-token [token & body]
   `(binding [*stripe-token* ~token] ~@body))
 
 ;; Root URL for the API calls
 (defonce api-root "https://api.stripe.com/v1")
 
-(defn- remove-nulls
-  "Removes from a map the keys with nil value."
-  [m]
+(defn- remove-nulls [m]
   (into {} (remove (comp nil? second) m)))
 
+;; (params kw) so that it returns nil if key not found usually occurs if endpt doesn't
+;; use an id and the entry in xxxx/url-mapping only has 1 element (url
+;; stub) or if the user provides invalid data
 (defn build-url
   "Accepts url-stubs in the form of e.g. [\"/customers\" :customer]"
   [params url-stubs]
   (reduce (fn [[url d] [stub kw]]
-            [(str url (str stub) (if-let [param (kw params)] (str "/" param) ""))
+            [(str url (str stub) (if-let [param (params kw)] (str "/" param) ""))
              (dissoc d kw)])
     ["" params]
     url-stubs))
@@ -39,22 +38,12 @@
 (defn build-options [token params]
   {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json})
 
-;; Doesn't really need to be a macro but saves reflection on the method
-;; Use if performance dictates?
-#_(defmacro make-request
-  "POSTs a to a url using the provided authentication token and parameters."
-  [method token url params]
-  `(try
-     (:body (~method (str ~api-root ~url) (build-options ~token ~params)))
-     (catch java.lang.Exception e# e#)))
-
 (defn make-request
-  "POSTs a to a url using the provided authentication token and parameters."
-  [method token url params]
+  [params method url]
   (try
-     (:body (method (str api-root url) (build-options token params)))
+     (:body (method (str api-root url) (build-options *stripe-token* params)))
      (catch java.lang.Exception e e)))
 
-(defn do-request [method token og-params & url-stubs]
+(defn do-request [og-params method & url-stubs]
   (let [[url params] (build-url og-params url-stubs)]
-    (make-request method token url params)))
+    (make-request params method url)))
