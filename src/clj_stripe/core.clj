@@ -60,11 +60,11 @@
   (let [[method extra-paths base-path] (get-in op-mapping [entity op])]
     (into [method] (into [(or base-path (entity url-mapping))] (or extra-paths [])))))
 
-(defn do-op [op-params entity] (apply do-request (:params op-params) (get-in op-mapping [entity (:op op-params)])))
+(defn do-op [op-params entity] (apply do-request (:params op-params) (get-op-details entity (:op op-params))))
 
 (defn on-charges [op-params] (do-op op-params :charges))
 (defn on-coupons [op-params] (do-op op-params :coupons))
-(defn on-customers [op-params] (do-op op-params :customer))
+(defn on-customers [op-params] (do-op op-params :customers))
 (defn on-invoiceitems [op-params] (do-op op-params :invoiceitems))
 (defn on-invoices [op-params] (do-op op-params :invoices))
 (defn on-plans [op-params] (do-op op-params :plans))

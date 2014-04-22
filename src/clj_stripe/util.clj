@@ -7,7 +7,8 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns clj-stripe.util
-	(:require [clj-http.client :as client]))
+  (:require [clj-http.client :as client])
+  (:require [clojure.walk :refer [prewalk]]))
 
 (defonce ^:dynamic *stripe-token* nil)
 
@@ -17,13 +18,14 @@
 ;; Root URL for the API calls
 (defonce api-root "https://api.stripe.com/v1")
 
+;; Currently only does top-level
 (defn- remove-nulls [m]
   (into {} (remove (comp nil? second) m)))
 
 ;; (params kw) so that it returns nil if key not found usually occurs if endpt doesn't
 ;; use an id and the entry in xxxx/url-mapping only has 1 element (url
 ;; stub) or if the user provides invalid data
-(defn build-url
+(defn- build-url
   "Accepts url-stubs in the form of e.g. [\"/customers\" :customer]"
   [params url-stubs]
   (reduce (fn [[url d] [stub kw]]
@@ -32,10 +34,10 @@
     ["" params]
     url-stubs))
 
-(defn kws-to-url-params [params]
-  (into {} (for [[k v] params] [(.replace (name k) "-" "_") v])))
+(defn- kws-to-url-params [params]
+  (prewalk #(if (keyword? %) (.replace (name %) "-" "_") %) params))
 
-(defn build-options [token params]
+(defn- build-options [token params]
   {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json})
 
 (defn make-request
