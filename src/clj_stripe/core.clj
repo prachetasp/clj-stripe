@@ -8,8 +8,58 @@
 
 (ns clj-stripe.core
     "Functions for Stripe Customers API"
-    (:require [clj-stripe.util :refer [do-request with-token]]
+    (:require [clojure.walk :refer [prewalk]]
               [clj-http.client :only [get post delete] :as client]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; UTILITY FUNCTIONS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; currently only supports private token
+;; TODO: add support for token selection
+(defonce stripe-tokens (atom {:public "" :private ""}))
+(defn set-tokens! [m] (swap! stripe-tokens (fn [a] (merge a m))))
+
+(defmacro with-token [token & body]
+  `(binding [*stripe-token* ~token] ~@body))
+
+;; Root URL for the API calls
+(defonce api-root "https://api.stripe.com/v1")
+
+;; Currently only does top-level
+(defn- remove-nulls [m]
+  (into {} (remove (comp nil? second) m)))
+
+;; (params kw) so that it returns nil if key not found usually occurs if endpt doesn't
+;; use an id and the entry in xxxx/url-mapping only has 1 element (url
+;; stub) or if the user provides invalid data
+(defn- build-url
+  "Accepts url-stubs in the form of e.g. [\"/customers\" :customer]"
+  [params url-stubs]
+  (reduce (fn [[url d] [stub kw]]
+            [(str url (str stub) (if-let [param (params kw)] (str "/" param) ""))
+             (dissoc d kw)])
+    ["" params]
+    url-stubs))
+
+(defn- kws-to-url-params [params]
+  (prewalk #(if (keyword? %) (.replace (name %) "-" "_") %) params))
+
+(defn- build-options [token params]
+  {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json})
+
+(defn do-request
+  [og-params method & url-stubs]
+  (let [[url params] (build-url og-params url-stubs)]
+    (try
+      (:body (method (str api-root url) (build-options (:private @stripe-tokens) params)))
+      (catch java.lang.Exception e e))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; API FUNCTIONS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def url-mapping {:cards ["/cards" :card-id]
                   :charges ["/charges" :charge-id]

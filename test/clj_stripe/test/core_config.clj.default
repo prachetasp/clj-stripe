@@ -1,0 +1,5 @@
+(ns clj-stripe.test.core-config)
+
+(def secret-tokens {:private "" :public ""})
+(def existing-cust-id "")
+(def test-plan "")

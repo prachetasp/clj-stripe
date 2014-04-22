@@ -6,3 +6,5 @@ pom.xml
 *~
 /src/clj-stripe/stripe.cjl*
 .nrepl-port
+.lein-failures
+core_config.clj
