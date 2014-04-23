@@ -46,7 +46,7 @@
   (prewalk #(if (keyword? %) (.replace (name %) "-" "_") %) params))
 
 (defn- build-options [token params]
-  {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json})
+  {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json :coerce :always})
 
 (defn do-request
   [og-params method & url-stubs]
