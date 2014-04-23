@@ -100,8 +100,8 @@
                             :pay [client/post [(:invoices-pay url-mapping)]]
                             :update [client/post]}
                  :plans crud-mapping
-                 :subscriptions {:cancel [client/delete [(:subscriptions url-mapping)] (:customers url-mapping)]
-                                 :create [client/post [(:subscriptions url-mapping)] (:customers url-mapping)]
+                 :subscriptions {:create [client/post [(:subscriptions url-mapping)] (:customers url-mapping)]
+                                 :delete [client/delete [(:subscriptions url-mapping)] (:customers url-mapping)]
                                  :get [client/get [(:subscriptions url-mapping)] (:customers url-mapping)]
                                  :update [client/post [(:subscriptions url-mapping)] (:customers url-mapping)]}
                  :tokens {:create [client/post]
