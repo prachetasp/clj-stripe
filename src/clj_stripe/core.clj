@@ -1,4 +1,4 @@
-;   Copyright (c) 2011 Alberto Bengoa. All rights reserved.
+;   Copyright (c) 2014 Alberto Bengoa/Prachetas Prabhu. All rights reserved.
 ;   The use and distribution terms for this software are covered by the
 ;   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
 ;   which can be found in the file epl-v10.html at the root of this distribution.
@@ -7,116 +7,54 @@
 ;   You must not remove this notice, or any other, from this software.
 
 (ns clj-stripe.core
-    "Functions for Stripe Customers API"
-    (:require [clojure.walk :refer [prewalk]]
-              [clj-http.client :only [get post delete] :as client]))
+  "Functions for Stripe Customers API"
+  (:require [clj-stripe.http-util :refer [do-request set-tokens!]]
+            [clj-http.client :only [get post delete] :as client]))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; UTILITY FUNCTIONS
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;; currently only supports private token
-;; TODO: add support for token selection
-(defonce stripe-tokens (atom {:public "" :private ""}))
-(defn set-tokens! [m] (swap! stripe-tokens (fn [a] (merge a m))))
-
-(defmacro with-token [token & body]
-  `(binding [*stripe-token* ~token] ~@body))
-
-;; Root URL for the API calls
-(defonce api-root "https://api.stripe.com/v1")
-
-;; Currently only does top-level
-(defn- remove-nulls [m]
-  (into {} (remove (comp nil? second) m)))
-
-;; (params kw) so that it returns nil if key not found usually occurs if endpt doesn't
-;; use an id and the entry in xxxx/url-mapping only has 1 element (url
-;; stub) or if the user provides invalid data
-(defn- build-url
-  "Accepts url-stubs in the form of e.g. [\"/customers\" :customer]"
-  [params url-stubs]
-  (reduce (fn [[url d] [stub kw]]
-            [(str url (str stub) (if-let [param (params kw)] (str "/" param) ""))
-             (dissoc d kw)])
-    ["" params]
-    url-stubs))
-
-(defn- kws-to-url-params [params]
-  (prewalk #(if (keyword? %) (.replace (name %) "-" "_") %) params))
-
-(defn- build-options [token params]
-  {:basic-auth [token] :query-params (remove-nulls (kws-to-url-params params)) :throw-exceptions false :as :json})
-
-(defn do-request
-  [og-params method & url-stubs]
-  (let [[url params] (build-url og-params url-stubs)]
-    (try
-      (:body (method (str api-root url) (build-options (:private @stripe-tokens) params)))
-      (catch java.lang.Exception e e))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; API FUNCTIONS
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def url-mapping {:cards ["/cards" :card-id]
-                  :charges ["/charges" :charge-id]
-                  :charges-capture ["/capture"] ; no-id endpt
-                  :charges-refund ["/refund"] ; no-id endpt
-                  :coupons ["/coupons" :coupon-id]
-                  :customers ["/customers" :customer-id]
+;; resources lacking test coverage are commented out
+(def url-mapping {:cards {:url "/cards" :base :customers}
+                  ;;:charges {:url "/charges"}
+                  ;;:charges-capture {:url "/capture" :base :charges} ; no-id endpt
+                  ;;:charges-refund {:url "/refund" :base :charges} ; no-id endpt
+                  ;;:coupons {:url "/coupons"}
+                  :customers {:url "/customers"}
                   ;;:discounts ["/discount"] ; no-id endpt
-                  :invoiceitems ["/invoiceitems" :invoiceitem-id]
-                  :invoices ["/invoices" :invoice-id]
-                  :invoices-lines ["/lines"] ; no-id endpt
-                  :invoices-pay ["/pay"] ; no id endpt
-                  :invoices-upcoming ["/upcoming"] ; no-id endpt
-                  :plans ["/plans" :plan-id]
-                  :subscriptions ["/subscriptions" :subscription-id]
-                  :tokens ["/tokens" :token-id]})
+                  :events {:url "/events"}
+                  ;;:invoiceitems {:url "/invoiceitems"}
+                  :invoices {:url "/invoices"}
+                  ;;:invoices-lines {:url "/lines" :base :invoices} ; no-id endpt
+                  ;;:invoices-pay {:url "/pay" :base :invoices} ; no id endpt
+                  ;;:invoices-upcoming {:url "/upcoming" :base :invoices} ; no-id endpt
+                  ;;:plans {:url "/plans"}
+                  :subscriptions {:url "/subscriptions" :base :customers}
+                  :tokens {:url "/tokens"}})
 
-(defonce crud-mapping {:create [client/post]
-                       :delete [client/delete]
-                       :get [client/get]
-                       :update [client/post]})
+;; assembles url stubs in path order
+;; uses list internally to conj at front
+(defn build-path [resource]
+  (into []
+    (let [get-base #(-> url-mapping % :base)]
+      (loop [res resource path '()]
+        (if (nil? res)
+          path
+          (recur (get-base res) (conj path [(-> url-mapping res :url) (name res)])))))))
 
-(def op-mapping {:charges {:capture [client/post [(:charges-capture url-mapping)]]
-                           :create [client/post]
-                           :get [client/get]
-                           :refund [client/post [(:charges-refund url-mapping)]]}
-                 :coupons {:create [client/post]
-                           :delete [client/delete]
-                           :get [client/get]}
-                 :customers crud-mapping
-                 :invoiceitems crud-mapping
-                 :invoices {:create [client/post]
-                            :get [client/get]
-                            :get-lines [client/get [(:invoices-lines url-mapping)]]
-                            :get-upcoming [client/get [(:invoices-upcoming url-mapping)]]
-                            :pay [client/post [(:invoices-pay url-mapping)]]
-                            :update [client/post]}
-                 :plans crud-mapping
-                 :subscriptions {:cancel [client/delete [(:subscriptions url-mapping)] (:customers url-mapping)]
-                                 :create [client/post [(:subscriptions url-mapping)] (:customers url-mapping)]
-                                 :get [client/get [(:subscriptions url-mapping)] (:customers url-mapping)]
-                                 :update [client/post [(:subscriptions url-mapping)] (:customers url-mapping)]}
-                 :tokens {:create [client/post]
-                          :get [client/get]}})
+;; TODO: add params validation e.g. to make sure a get-list doesn't
+;; contain an id
+(defmacro defop [op-name http-action & {:keys [op]}]
+  `(def ~op-name
+     (fn [resource# params#]
+       (do-request params# ~http-action (build-path (if ~op
+                                                      (-> resource# name (str "-" ~op) keyword)
+                                                      resource#))))))
 
-;; properly formats method and url
-(defn get-op-details [entity op]
-  (let [[method extra-paths base-path] (get-in op-mapping [entity op])]
-    (into [method] (into [(or base-path (entity url-mapping))] (or extra-paths [])))))
-
-(defn do-op [op-params entity] (apply do-request (:params op-params) (get-op-details entity (:op op-params))))
-
-(defn on-charges [op-params] (do-op op-params :charges))
-(defn on-coupons [op-params] (do-op op-params :coupons))
-(defn on-customers [op-params] (do-op op-params :customers))
-(defn on-invoiceitems [op-params] (do-op op-params :invoiceitems))
-(defn on-invoices [op-params] (do-op op-params :invoices))
-(defn on-plans [op-params] (do-op op-params :plans))
-(defn on-subscriptions [op-params] (do-op op-params :subscriptions))
-(defn on-tokens [op-params] (do-op op-params :tokens))
+;; operations lacking test coverage are commented out
+(defop stripe-cancel client/delete)
+#_(defop stripe-capture client/post :op "capture")
+(defop stripe-create client/post)
+(defop stripe-delete client/delete)
+(defop stripe-get client/get)
+(defop stripe-list client/get)
+#_(defop stripe-pay client/post :op "pay")
+#_(defop stripe-refund client/post :op "refund")
+(defop stripe-update client/post)
