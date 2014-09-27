@@ -6,10 +6,10 @@
 ;   the terms of this license.
 ;   You must not remove this notice, or any other, from this software.
 
-(ns clj-stripe.test.core
-  (:use [clj-stripe core])
-  (:require [clj-stripe.http-util :refer [set-tokens! name-to-kw]])
-  (:require [clj-stripe.test.core-config :refer [existing-cust-id secret-tokens test-plan]])
+(ns stripe-clojure.test.core
+  (:use [stripe-clojure core])
+  (:require [stripe-clojure.http-util :refer [set-tokens! name-to-kw]])
+  (:require [stripe-clojure.test.core-config :refer [existing-cust-id secret-tokens test-plan]])
   (:require [clojure.test :refer [deftest is testing]]))
 
 (deftest test-build-path

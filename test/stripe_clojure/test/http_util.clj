@@ -6,8 +6,8 @@
 ;   the terms of this license.
 ;   You must not remove this notice, or any other, from this software.
 
-(ns clj-stripe.test.http-util
-  (:use [clj-stripe http-util])
+(ns stripe-clojure.test.http-util
+  (:use [stripe-clojure http-util])
   (:require [clojure.test :as test]))
 
 (test/deftest test-url-creation

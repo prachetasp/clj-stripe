@@ -6,9 +6,9 @@
 ;   the terms of this license.
 ;   You must not remove this notice, or any other, from this software.
 
-(ns clj-stripe.core
+(ns stripe-clojure.core
   "Functions for Stripe Customers API"
-  (:require [clj-stripe.http-util :refer [do-request set-tokens!]]
+  (:require [stripe-clojure.http-util :refer [do-request set-tokens!]]
             [clj-http.client :only [get post delete] :as client]))
 
 ;; resources lacking test coverage are commented out

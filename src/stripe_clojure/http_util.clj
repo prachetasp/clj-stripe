@@ -6,7 +6,7 @@
 ;   the terms of this license.
 ;   You must not remove this notice, or any other, from this software.
 
-(ns clj-stripe.http-util
+(ns stripe-clojure.http-util
     "HTTP Utility Functions for Stripe Customers API"
     (:require [clojure.walk :refer [prewalk]]))
 
