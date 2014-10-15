@@ -12,11 +12,11 @@
   (:require [stripe-clojure.test.core-config :refer [existing-cust-id secret-tokens test-plan]])
   (:require [clojure.test :refer [deftest is testing]]))
 
-(deftest test-build-path
+#_(deftest test-build-path
   (is (= (build-path :subscriptions) [["/customers" "customers"] ["/subscriptions" "subscriptions"]]) "Building resource path"))
 
 (def crud-params #{:get :create :update :delete :base})
-(def test-card {:number "4242424242424242" :exp-month 12 :exp-year 2020 :cvc 123 :name "Mr. Stripe Clojure"})
+(def test-card {:number "4242424242424242" :exp_month 12 :exp_year 2020 :cvc 123 :name "Mr. Stripe Clojure"})
 (def test-customer {:card test-card
                     :email "mrclojure@stripetest.com"
                     :description "customer test from clj-stripe"})
@@ -25,29 +25,29 @@
 
 ;; Only tests CRUD for now
 ;; TODO: Add ability to specify assertion for non-crud operations
-(defmacro test-resource [r-kw params]
-  `(let [base-params# (or (:base ~params) {})
-         do-op# (fn [op# r# & ps#] (op# r# (apply merge base-params# ps#)))
+(defmacro deftest-resource [r-kw params]
+  `(let [bps# (merge {} (:base ~params))
+         ;;do-op# (fn [op# r# & ps#] (op# r# (apply merge ps# (:base ~params))))
          {r-id# :id :as r-result#} (if-let [ps# (:create ~params)]
-                                     (do-op# stripe-create ~r-kw ps#)
-                                     (do-op# stripe-get ~r-kw (:get ~params)))
+                                     (stripe-create ~r-kw (merge ps# bps#))
+                                     (stripe-get ~r-kw (merge (:get ~params) bps#)))
          r-map# {(name-to-kw (name ~r-kw)) r-id#}
          ;;non-crud-ops# (select-keys ~params (filter #(not (contains? crud-params %)) (keys ~params)))
          ]
      (testing "create (or first get for non-create resources)" (is (not (nil? r-id#))))
-     (testing "get") (is (= (do-op# stripe-get ~r-kw r-map#) r-result#))
+     (testing "get") (is (= (stripe-get ~r-kw (merge r-map# bps#)) r-result#))
      (when-let [ps# (:update ~params)]
-       (testing "update" (is (= (do-op# stripe-update ~r-kw r-map# ps#) (do-op# stripe-get ~r-kw r-map#)))))
+       (testing "update" (is (= (stripe-update ~r-kw (merge r-map# ps# bps#)) (stripe-get ~r-kw (merge r-map# bps#))))))
      #_(doseq [[op# op-params#] non-crud-ops#]
-         (do-op# op# ~r-kw r-map# op-params#))
-     (when-let [d-op# (:delete ~params)]
-       (do-op# d-op# ~r-kw r-map#)
-       (testing "delete/cancel" (is (nil? (some #{r-id#} (map :id (:data (do-op# stripe-list ~r-kw))))))))))
+         (op# ~r-kw (merge r-map# op-params# bps#)))
+     (if (:delete ~params)
+       ((:delete ~params) ~r-kw (merge r-map# bps#))
+       (testing "delete/cancel" (is (every? false? (map #(= r-id# (:id %)) (:data (stripe-list ~r-kw bps#)))))))))
 
 (deftest cards-test
   (testing "Cards"
-      (test-resource :cards
-        {:base {:customer-id existing-cust-id}
+      (deftest-resource :cards
+        {:base {:customer_id existing-cust-id}
          :create {:card test-card}
          :update {:name "Mr. NewStripe Clojure"}
          :delete stripe-delete})))
@@ -56,11 +56,11 @@
   (testing "Card Tokens"
     (let [{token-id :id :as create-token-result} (stripe-create :tokens {:card test-card})]
       (testing "create" (is (not (nil? token-id))))
-      (testing "get" (is (= (stripe-get :tokens {:token-id token-id}) create-token-result))))))
+      (testing "get" (is (= (stripe-get :tokens {:token_id token-id}) create-token-result))))))
 
 (deftest customers-test
   (testing "Customers"
-    (test-resource :customers
+    (deftest-resource :customers
       {:create test-customer
        :update {:email "newmrclojure@stripetest.com"}
        :delete stripe-cancel})))
@@ -69,12 +69,12 @@
   (testing "Events"
     (let [{event-id :id :as recent-event} (-> (stripe-get :events {}) :data first)]
       (testing "list" (is (not (nil? event-id))))
-      (testing "get" (is (= (stripe-get :events {:event-id event-id}) recent-event))))))
+      (testing "get" (is (= (stripe-get :events {:event_id event-id}) recent-event))))))
 
 (deftest subscriptions-test
   (testing "Subscriptions"
-    (test-resource :subscriptions
+    (deftest-resource :subscriptions
       {:create {:plan test-plan}
-       :base {:customer-id existing-cust-id}
+       :base {:customer_id existing-cust-id}
        :update {:quantity 2}
        :delete stripe-delete})))

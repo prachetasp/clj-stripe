@@ -10,7 +10,7 @@
   (:use [stripe-clojure http-util])
   (:require [clojure.test :as test]))
 
-(test/deftest test-url-creation
+#_(test/deftest test-url-creation
   (let [stubs [["/customers" "customers"] ["/subscriptions" "subscriptions"] ["/tokens" "tokens"] ["/discount" "subscriptions-discount"]]]
     (test/is (= (name-to-kw "customers")
                :customer-id)

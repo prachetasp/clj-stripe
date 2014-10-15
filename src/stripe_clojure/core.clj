@@ -11,42 +11,50 @@
   (:require [stripe-clojure.http-util :refer [do-request set-tokens!]]
             [clj-http.client :only [get post delete] :as client]))
 
-;; resources lacking test coverage are commented out
-(def url-mapping {:cards {:url "/cards" :base :customers}
-                  ;;:charges {:url "/charges"}
-                  ;;:charges-capture {:url "/capture" :base :charges} ; no-id endpt
-                  ;;:charges-refund {:url "/refund" :base :charges} ; no-id endpt
-                  ;;:coupons {:url "/coupons"}
-                  :customers {:url "/customers"}
-                  ;;:discounts ["/discount"] ; no-id endpt
-                  :events {:url "/events"}
-                  ;;:invoiceitems {:url "/invoiceitems"}
-                  :invoices {:url "/invoices"}
-                  ;;:invoices-lines {:url "/lines" :base :invoices} ; no-id endpt
-                  ;;:invoices-pay {:url "/pay" :base :invoices} ; no id endpt
-                  ;;:invoices-upcoming {:url "/upcoming" :base :invoices} ; no-id endpt
-                  ;;:plans {:url "/plans"}
-                  :subscriptions {:url "/subscriptions" :base :customers}
-                  :tokens {:url "/tokens"}})
+(def url-vals {"cards" :card_id
+               ;;"charges" :charge_id
+               ;;"coupons" :coupon_id
+               "customers" :customer_id
+               "events" :event_id
+               ;;"invoiceitems" :invoiceitem_id
+               "invoices" :invoice_id
+               "plans" :plan_id
+               "subscriptions" :subscription_id
+               "tokens" :token_id})
 
-;; assembles url stubs in path order
-;; uses list internally to conj at front
-(defn build-path [resource]
-  (into []
-    (let [get-base #(-> url-mapping % :base)]
-      (loop [res resource path '()]
-        (if (nil? res)
-          path
-          (recur (get-base res) (conj path [(-> url-mapping res :url) (name res)])))))))
+(defn build-url-map-vals [resources]
+  [resources (map url-vals resources)])
+
+;; resources lacking test coverage are commented out
+;; contains a map like {:cards [["customers" "cards"] [:customer_id :card_id]]...}
+(def url-mapping (into {}
+                   (map (fn [[k v]] [k (build-url-map-vals v)])
+                     {:cards ["customers" "cards"]
+                      ;;:charges ["charges"]
+                      ;;:charges-capture ["charges" "capture"] ; no-id endpt
+                      ;;:charges-refund ["charges" "refund"] ; no-id endpt
+                      ;;:coupons ["coupons"]
+                      :customers ["customers"]
+                      ;;:discounts ["customers" "discount"] ; no-id endpt
+                      :events ["events"]
+                      ;;:invoiceitems ["invoiceitems"]
+                      :invoices ["invoices"]
+                      ;;:invoices-lines ["invoices" "lines"] ; no-id endpt
+                      ;;:invoices-pay ["invoices" "pay"] ; no id endpt
+                      ;;:invoices-upcoming ["invoices" "upcoming"] ; no-id endpt
+                      :plans ["plans"]
+                      :subscriptions ["customers" "subscriptions"]
+                      :tokens ["tokens"]})))
 
 ;; TODO: add params validation e.g. to make sure a get-list doesn't
 ;; contain an id
 (defmacro defop [op-name http-action & {:keys [op]}]
   `(def ~op-name
      (fn [resource# params#]
-       (do-request params# ~http-action (build-path (if ~op
-                                                      (-> resource# name (str "-" ~op) keyword)
-                                                      resource#))))))
+       (do-request params# ~http-action
+         (url-mapping (if ~op
+                        (-> resource# name (str "-" ~op) keyword)
+                        resource#))))))
 
 ;; operations lacking test coverage are commented out
 (defop stripe-cancel client/delete)
