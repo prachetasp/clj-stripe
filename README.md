@@ -1,152 +1,71 @@
-clj-stripe
+stripe-clojure
 ================================
 
-clj-stripe is a library that provides Clojure bindings for the Stripe API.
+stripe-clojure is intended as a lightweight wrapper around the [Stripe API](https://stripe.com/docs/api "Stripe API Documentation")
 
 Usage
 ================================
 
-clj-stripe wraps around the Stripe REST API. For a detailed explanation of the available operations and parameters visit https://stripe.com/api/docs .
+stripe-clojure attempts to leverage functional style by allowing the user to call actions on map's. The action's names are those found in the Stripe API docs e.g. (retrieve, create, delete, update etc.) The data contained in each map also uses the same naming scheme found in the Stripe docs.
 
-The general way of invoking operation is:
+The first step is to add the library to the project.clj file:
 
-* To execute an operation, first create it using the appropriate funcion. For example, to create an operation for retrieving a customer, just execute
-(customers/get-customer "mycustomerid")
-That will return a map that represents the action of retrieving that customer.
-* Some operations require parameters that are provided through other functions. For example, the function customers/get-customers (that retrieves all customers) accepts two optional parameters, count and offset. To create that operation you must use auxiliary functions defined in the common namespace:
-(customers/get-customers (common/limit-count 10) (common/offset 4))
-or, for brevity,
-(customers/get-customers (common/position 10 4))
-* Once created, execute an operation by passing it as parameter to the common/execute multimethod.
-* Wrap all the calls to execute in a call to common/with-token. That will provide the authentication token needed when invoking the Stripe API.
+```
+[prachetasp/stripe-clojure "1.0.0"]
+```
 
-  Examples
+Everything is located in the `stripe-clojure.core` namespace. Add to your namespace declaration:
+
+```
+(:require [stripe-clojure.core :as s])
+```
+
+The authentication token must be set so it can be used in calls to the API. stripe-clojure currently only supports using the private token. To set the token:
+
+``` 
+(set-tokens! {:private "sk_test_fkjdskfjdskfjdslkf"})
+```
+
+Once the token has been set you can execute operations against the API.
+
+Currently supported operations are: `cancel`, `create`, `delete`, `retrieve`, `list`, and `update`
+
+These operations accept a map of a map of data keyed by the resource. For example:
+
+```
+{:customers {:customer_id "cus_5An5UPQPrSaS9e", :email "mrclojure@stripetest.com", :description "customer test"}}
+```
+
+Currently supported resources are: `cards`, `customers`, `events`, `invoices`, `plans`, `subscriptions`, and `tokens`
+
+Putting it all together to update an existing user:
+
+```
+(s/update {:customers {:customer_id "cus_5An5UPQPrSaS9e", :email "mrclojure@stripetest.com", :description "customer test"}})
+```
+
+The details of the data vary for different resources and operations but the names (keys in the map) are always the same as in the stripe documentation.
+
+A successful request will return a map of the json data returned from Stripe. A failure will return a map containing the type of error and message. The general structure of an error map is:
+
+```
+{:error {:type "invalid_request_error", :message "Received unknown parameter: fail", :param "fail"}}
+```
+
+Therefore, testing for :error in the response allows you to identify and handle errors.
+
+Contributing
 ================================
 
-* Declare the dependency to clj-stripe in your project.clj
+Due to the lightweight nature of the library contributing is easy. Simply make your changes, write a test (if applicable) and submit a PR. The goals of the library are to remain small and fast. Changes that increase performance are encouraged!
 
-```
-:dependencies [abengoa/clj-stripe "1.0.4"]
-```
+To run the tests copy `/test/stripe_clojure/test/core_config.clj.example` to `/test/stripe_clojure/test/core_config.clj` and add the private authentication token to the map `secret-tokens`. core_config.clj is included in the .gitignore file to prevent accidentally leaking tokens.
 
-* Import the namespaces you may need
-
-```
-(:require [clj-stripe.util :as util]
-	  [clj-stripe.common :as common]
-	  [clj-stripe.plans :as plans]
-	  [clj-stripe.coupons :as coupons]
-	  [clj-stripe.charges :as charges]
-	  [clj-stripe.cards :as cards]
-	  [clj-stripe.subscriptions :as subscriptions]
-	  [clj-stripe.customers :as customers]
-	  [clj-stripe.invoices :as invoices]
-	  [clj-stripe.invoiceitems :as invoiceitems])
-```
-
-* First step is to create a some subscription plans:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (plans/create-plan "plan1" (common/money-quantity 500 "usd") (plans/monthly) "Starter"))
-    (common/execute (plans/create-plan "plan2" (common/money-quantity 1000 "usd") (plans/monthly) "Professional")))
-```
-
-* To show a user the list of available plans:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (plans/get-all-plans)))
-```
-
-* When a new user signs up, create a new customer:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (customers/create-customer (common/card "A card token obtained with stripe.js") (customers/email "site@stripe.com") (common/plan "plan1"))))
-```
-
-* To display the customer information:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (customers/get-customer "cu_1mXfGxS9m8")))
-```
-
-* And the billing status of the customer:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (invoices/get-upcoming-invoice (common/customer "cu_1mXfGxS9m8"))))
-```
-
-* Get all the invoices of a customer:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-	(common/execute (invoices/get-all-invoices (common/customer "cu_1mXfGxS9m8"))))
-```
-
-* Get an individual invoice:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-	(common/execute (invoices/get-invoice "INVOICE_ID")))
-```
-
-* For a one time charge to an existing customer:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (charges/create-charge (common/money-quantity 5000 "usd") (common/customer "cu_1mXfGxS9m8") (common/description "This an extra charge for some stuff"))))
-```
-
-* Get all the charges that were billed to a customer:
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (charges/get-all-charges (common/customer "cu_1mXfGxS9m8"))))
-```
-
-* Get all the charges of a customer, paginated (get 5 charges starting at index 20):
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (charges/get-all-charges (common/customer "cu_1mXfGxS9m8") (common/position 5 20))))
-```
-
-* If a charge needs to be refunded
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (charges/create-refund "charge-id")))
-```
-
-* Upgrade the plan of a customer
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (subscriptions/subscribe-customer (common/plan "plan2") (common/customer "cu_1mXfGxS9m8") (subscriptions/do-not-prorate))))
-```
-
-* Unsubscribe a customer from the current plan
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (subscriptions/unsubscribe-customer (common/customer "cu_1mXfGxS9m8") (subscriptions/immediately))))
-```
-
-* Delete a customer
-
-```
-(common/with-token "vtUQeOtUnYr7PGCLQ96Ul4zqpDUO4sOE:"
-    (common/execute (customers/delete-customer "cu_1mXfGxS9m8")))
-```
-
+Tests can then be run with `lein test`.
 
 License
 ================================
 
-Copyright (C) 2011 Alberto Bengoa
+Copyright (C) 2014 Prachetas Prabhu
 
-Distributed under the Eclipse Public License, the same as Clojure.
+Distributed under the Eclipse Public License.

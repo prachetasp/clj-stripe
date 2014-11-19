@@ -43,4 +43,7 @@
       (s/delete {:customers c-id})
       (testing "delete and list" (is (every? false?
                                        (map #(= id (:id %))
-                                                      (:data (s/list {:customers {}})))))))))
+                                         (:data (s/list {:customers {}})))))))))
+
+(deftest error-message
+  (is (contains? (s/create {:customers {:customer_id "xxx1" :fail "test"}}) :error) "error message return"))
